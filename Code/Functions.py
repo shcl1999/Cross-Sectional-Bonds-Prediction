@@ -123,13 +123,14 @@ def tuned_model(X_train, Y_train, X_val, Y_val, modelname, params):
     if modelname == 'RF':
         for depth in params['max_depth']:
             for features in params['max_features']:
-                model = RandomForestRegressor(max_depth = int(depth), n_estimators = 300, max_features = int(features))
-                model.fit(X_train, Y_train.ravel())
-                Y_pred = model.predict(X_val)
-                r2_test = evaluate_model(Y_pred, Y_val)
-                if r2_test > r2_score:
-                    r2_score = r2_test
-                    best_model = model
+                for n_estimator in params['n_estimators']:
+                    model = RandomForestRegressor(max_depth = int(depth), n_estimators = int(n_estimator), max_features = int(features))
+                    model.fit(X_train, Y_train.ravel())
+                    Y_pred = model.predict(X_val)
+                    r2_test = evaluate_model(Y_pred, Y_val)
+                    if r2_test > r2_score:
+                        r2_score = r2_test
+                        best_model = model
 
 
     if modelname == 'XGB':
@@ -177,11 +178,11 @@ def tuned_model(X_train, Y_train, X_val, Y_val, modelname, params):
     return best_model
 
 def fit_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params):
-
+    print('Starting model fitting...')
     model = tuned_model(X_train, Y_train, X_val, Y_val, modelname = modelname, params = params)
     counter = 0
     Y_pred = np.zeros(Y_test.shape[0])
-
+    print('Starting predictions...')
     for i in range(len(X_test)):
         Y_pred[i] = model.predict(X_test[i].reshape(1, -1))
 
