@@ -156,6 +156,7 @@ def tuned_model(X_train, Y_train, X_val, Y_val, modelname, params):
                     if r2_test > r2_score:
                         r2_score = r2_test
                         best_model = model
+                        
 
     if modelname == 'NN':
         for hidden_layer_sizes in params['hidden_layer_sizes']:
@@ -174,7 +175,10 @@ def tuned_model(X_train, Y_train, X_val, Y_val, modelname, params):
                                             r2_score = r2_test
                                             best_model = model
 
-    
+                        
+    X_train_val = np.concatenate((X_train, X_val), axis=0)
+    Y_train_val = np.concatenate((Y_train, Y_val), axis=0)
+    best_model.fit(X_train_val, Y_train_val)
     return best_model
 
 def fit_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params):
@@ -182,18 +186,30 @@ def fit_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params)
     model = tuned_model(X_train, Y_train, X_val, Y_val, modelname = modelname, params = params)
     counter = 0
     Y_pred = np.zeros(Y_test.shape[0])
+    print('Initial shapes')
+    print(X_train.shape)
+    print(Y_train.shape)
+    print(X_val.shape)
+    print(Y_val.shape)
+
     print('Starting predictions...')
     for i in range(len(X_test)):
         Y_pred[i] = model.predict(X_test[i].reshape(1, -1))
 
         counter += 1
         if counter % (1*35) == 0:
-            X_train = np.concatenate((X_train, X_val[:i]), axis=0)
-            Y_train = np.concatenate((Y_train, Y_val[:i]), axis=0)
-            X_val = X_val[i:]
-            X_val = np.concatenate((X_val, X_test[:i]), axis=0)
-            Y_val = Y_val[i:]
-            Y_val = np.concatenate((Y_val, Y_test[:i]), axis=0)
+            X_train = np.concatenate((X_train, X_val[:35]), axis=0)
+            Y_train = np.concatenate((Y_train, Y_val[:35]), axis=0)
+            X_val = X_val[35:]
+            X_val = np.concatenate((X_val, X_test[:35]), axis=0)
+            Y_val = Y_val[35:]
+            Y_val = np.concatenate((Y_val, Y_test[:35]), axis=0)
+
+            print(X_train.shape)
+            print(Y_train.shape)
+            print(X_val.shape)
+            print(Y_val.shape)
+
             model = tuned_model(X_train, Y_train, X_val, Y_val, modelname = modelname, params = params)
 
             # print percentage of run time
