@@ -190,7 +190,7 @@ def tuned_model(X_train, Y_train, X_val, Y_val, modelname, params):
     best_model.fit(X_train_val, Y_train_val)
     return best_model
 
-def fit_model_test(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params):
+def fit_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params):
     print('Starting model fitting...')
     model = tuned_model(X_train, Y_train, X_val, Y_val, modelname = modelname, params = params)
     counter = 0
