@@ -117,10 +117,9 @@ def tuned_model(X_train, Y_train, X_val, Y_val, modelname, params):
     if modelname == 'Elastic':
         for alpha in params['alpha']:
             for l1 in params['l1_ratio']:
-                model = ElasticNet(alpha = alpha, l1_ratio = l1, fit_intercept= False, tol=1)
-                model.fit(X_train, Y_train.ravel())
+                model = ElasticNet(alpha = alpha, l1_ratio = l1, fit_intercept= False, tol=1).fit(X_train, Y_train.ravel())
                 Y_pred = model.predict(X_val)
-                r2_test = evaluate_model(Y_pred, Y_val)
+                r2_test = evaluate_model_handwritten(Y_pred, Y_val)
                 if r2_test > r2_score:
                     r2_score = r2_test
                     best_model = model
@@ -136,7 +135,7 @@ def tuned_model(X_train, Y_train, X_val, Y_val, modelname, params):
                     model = RandomForestRegressor(max_depth = int(depth), n_estimators = int(n_estimator), max_features = int(features))
                     model.fit(X_train, Y_train.ravel())
                     Y_pred = model.predict(X_val)
-                    r2_test = evaluate_model(Y_pred, Y_val)
+                    r2_test = evaluate_model_handwritten(Y_pred, Y_val)
                     if r2_test > r2_score:
                         r2_score = r2_test
                         best_model = model
@@ -149,7 +148,7 @@ def tuned_model(X_train, Y_train, X_val, Y_val, modelname, params):
                     model = XGBRegressor(max_depth = int(depth), n_estimators = int(n_estimator), learning_rate = lr)
                     model.fit(X_train, Y_train.ravel())
                     Y_pred = model.predict(X_val)
-                    r2_test = evaluate_model(Y_pred, Y_val)
+                    r2_test = evaluate_model_handwritten(Y_pred, Y_val)
                     if r2_test > r2_score:
                         r2_score = r2_test
                         best_model = model
@@ -161,10 +160,11 @@ def tuned_model(X_train, Y_train, X_val, Y_val, modelname, params):
                     model = SVR(C = c, gamma = gamma, kernel = kernel)
                     model.fit(X_train, Y_train.ravel())
                     Y_pred = model.predict(X_val)
-                    r2_test = evaluate_model(Y_pred, Y_val)
+                    r2_test = evaluate_model_handwritten(Y_pred, Y_val)
                     if r2_test > r2_score:
                         r2_score = r2_test
                         best_model = model
+                        print(best_model.get_params())
                         
 
     if modelname == 'NN':
@@ -179,7 +179,7 @@ def tuned_model(X_train, Y_train, X_val, Y_val, modelname, params):
                                         model = MLPRegressor(hidden_layer_sizes = hidden_layer_sizes, activation = activation, solver = solver, learning_rate_init = learning_rate_init, alpha = alpha, batch_size = batch_size, learning_rate = learning_rate, max_iter = max_iter)
                                         model.fit(X_train, Y_train)
                                         Y_pred = model.predict(X_val)
-                                        r2_test = evaluate_model(Y_pred, Y_val)
+                                        r2_test = evaluate_model_handwritten(Y_pred, Y_val)
                                         if r2_test > r2_score:
                                             r2_score = r2_test
                                             best_model = model
@@ -190,7 +190,7 @@ def tuned_model(X_train, Y_train, X_val, Y_val, modelname, params):
     best_model.fit(X_train_val, Y_train_val)
     return best_model
 
-def fit_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params):
+def fit_model_test(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params):
     print('Starting model fitting...')
     model = tuned_model(X_train, Y_train, X_val, Y_val, modelname = modelname, params = params)
     counter = 0
@@ -218,4 +218,3 @@ def fit_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params)
     print('Gu Kelly R2 score:', evaluate_model_handwritten(Y_pred, Y_test))
 
     return Y_pred
-
