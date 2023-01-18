@@ -186,11 +186,6 @@ def fit_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params)
     model = tuned_model(X_train, Y_train, X_val, Y_val, modelname = modelname, params = params)
     counter = 0
     Y_pred = np.zeros(Y_test.shape[0])
-    print('Initial shapes')
-    print(X_train.shape)
-    print(Y_train.shape)
-    print(X_val.shape)
-    print(Y_val.shape)
 
     print('Starting predictions...')
     for i in range(len(X_test)):
@@ -204,11 +199,6 @@ def fit_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params)
             X_val = np.concatenate((X_val, X_test[:35]), axis=0)
             Y_val = Y_val[35:]
             Y_val = np.concatenate((Y_val, Y_test[:35]), axis=0)
-
-            print(X_train.shape)
-            print(Y_train.shape)
-            print(X_val.shape)
-            print(Y_val.shape)
 
             model = tuned_model(X_train, Y_train, X_val, Y_val, modelname = modelname, params = params)
 
