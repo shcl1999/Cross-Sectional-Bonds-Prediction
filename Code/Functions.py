@@ -96,6 +96,15 @@ def evaluate_model(Y_pred, Y_test):
     
     return r2_test
 
+def evaluate_model_handwritten(Y_pred, Y_test):
+    # R squared score
+
+    num = (sum(pow((Y_test.ravel()-Y_pred),2)))
+    denum = sum(pow(Y_test.ravel(),2))
+
+    r2_test = 1-num/denum
+    return r2_test
+
 def tuned_model(X_train, Y_train, X_val, Y_val, modelname, params):
 
     r2_score = -100
@@ -108,7 +117,7 @@ def tuned_model(X_train, Y_train, X_val, Y_val, modelname, params):
     if modelname == 'Elastic':
         for alpha in params['alpha']:
             for l1 in params['l1_ratio']:
-                model = ElasticNet(alpha = alpha, l1_ratio = l1)
+                model = ElasticNet(alpha = alpha, l1_ratio = l1, fit_intercept= False, tol=1)
                 model.fit(X_train, Y_train.ravel())
                 Y_pred = model.predict(X_val)
                 r2_test = evaluate_model(Y_pred, Y_val)
@@ -205,7 +214,8 @@ def fit_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params)
             # print percentage of run time
             print('Percentage of run time: ', round(counter/len(X_test)*100, 2), '%')
 
-    r2_test = evaluate_model(Y_pred, Y_test)
-    print('R2 score: ', r2_test)
+    print('Traditional R2 score: ', evaluate_model(Y_pred, Y_test))
+    print('Gu Kelly R2 score:', evaluate_model_handwritten(Y_pred, Y_test))
 
     return Y_pred
+
