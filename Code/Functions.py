@@ -190,7 +190,7 @@ def tuned_model(X_train, Y_train, X_val, Y_val, modelname, params):
     best_model.fit(X_train_val, Y_train_val)
     return best_model
 
-def fit_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params):
+def fit_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params, retain_month = 1, hypertuneOnce = False):
     print('Starting model fitting...')
     model = tuned_model(X_train, Y_train, X_val, Y_val, modelname = modelname, params = params)
     counter = 0
@@ -201,7 +201,7 @@ def fit_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params)
         Y_pred[i] = model.predict(X_test[i].reshape(1, -1))
 
         counter += 1
-        if counter % (1*35) == 0:
+        if counter % (retain_month*35) == 0:
             X_train = np.concatenate((X_train, X_val[:35]), axis=0)
             Y_train = np.concatenate((Y_train, Y_val[:35]), axis=0)
             X_val = X_val[35:]
@@ -209,7 +209,10 @@ def fit_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params)
             Y_val = Y_val[35:]
             Y_val = np.concatenate((Y_val, Y_test[:35]), axis=0)
 
-            model = tuned_model(X_train, Y_train, X_val, Y_val, modelname = modelname, params = params)
+            if (hypertuneOnce):
+                model = model.fit(X_train, Y_train)
+            else:
+                model = tuned_model(X_train, Y_train, X_val, Y_val, modelname = modelname, params = params)
 
             # print percentage of run time
             print('Percentage of run time: ', round(counter/len(X_test)*100, 2), '%')
