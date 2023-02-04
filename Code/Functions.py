@@ -134,7 +134,7 @@ def evaluate_model_handwritten(Y_pred, Y_test):
 
 def tuned_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params):
 
-    r2_score = -100
+    r2_score = -1000000000000000000000000000000
     best_model = None
 
     if modelname == 'OLS':
@@ -163,7 +163,7 @@ def tuned_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, param
                     model.fit(X_train, Y_train.ravel())
                     Y_pred = model.predict(X_val)
                     r2_test = evaluate_model_handwritten(Y_pred, Y_val)
-                    print(r2_test)
+                    #print(r2_test)
                     if r2_test > r2_score:
                         r2_score = r2_test
                         best_model = model
@@ -178,7 +178,7 @@ def tuned_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, param
                         model.fit(X_train, Y_train.ravel())
                         Y_pred = model.predict(X_val)
                         r2_test = evaluate_model_handwritten(Y_pred, Y_val)
-                        print(r2_test)
+                        #print(r2_test)
                         if r2_test > r2_score:
                             r2_score = r2_test
                             best_model = model
@@ -187,31 +187,31 @@ def tuned_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, param
         for c in params['C']:
             for gamma in params['gamma']:
                 for kernel in params['kernel']:
-                    model = SVR(C = c, gamma = gamma, kernel = kernel)
-                    model.fit(X_train, Y_train.ravel())
-                    Y_pred = model.predict(X_val)
-                    r2_test = evaluate_model_handwritten(Y_pred, Y_val)
-                    print(r2_test)
-                    if r2_test > r2_score:
-                        r2_score = r2_test
-                        best_model = model    
+                    for epsilon in params['epsilon']:
+                        model = SVR(C = c, gamma = gamma, kernel = kernel, epsilon = epsilon)
+                        model.fit(X_train, Y_train.ravel())
+                        Y_pred = model.predict(X_val)
+                        r2_test = evaluate_model_handwritten(Y_pred, Y_val)
+                        #print(r2_test)
+                        if r2_test > r2_score:
+                            r2_score = r2_test
+                            best_model = model    
 
     if modelname == 'NN':
         for hidden_layer_sizes in params['hidden_layer_sizes']:
             for activation in params['activation']:
                 for solver in params['solver']:
                     for learning_rate_init in params['learning_rate_init']:
-                        for lbda in params['lambda']:
-                            for batch_size in params['batch_size']:
-                                for learning_rate in params['learning_rate']:
-                                        model = MLPRegressor(hidden_layer_sizes = hidden_layer_sizes, activation = activation, solver = solver, learning_rate_init = learning_rate_init, learning_rate = learning_rate, batch_size= batch_size,)
-                                        model.fit(X_train, Y_train.ravel())
-                                        Y_pred = model.predict(X_val)
-                                        r2_test = evaluate_model_handwritten(Y_pred, Y_val)
-                                        print(r2_test)
-                                        if r2_test > r2_score:
-                                            r2_score = r2_test
-                                            best_model = model
+                        for batch_size in params['batch_size']:
+                            for learning_rate in params['learning_rate']:
+                                    model = MLPRegressor(hidden_layer_sizes = hidden_layer_sizes, activation = activation, solver = solver, learning_rate_init = learning_rate_init, learning_rate = learning_rate, batch_size= batch_size,)
+                                    model.fit(X_train, Y_train.ravel())
+                                    Y_pred = model.predict(X_val)
+                                    r2_test = evaluate_model_handwritten(Y_pred, Y_val)
+                                    #print(r2_test)
+                                    if r2_test > r2_score:
+                                        r2_score = r2_test
+                                        best_model = model
 
                         
     X_train_val = np.concatenate((X_train, X_val), axis=0)
@@ -219,67 +219,54 @@ def tuned_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, param
     best_model.fit(X_train_val, Y_train_val)
     return best_model
 
-def fit_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params, retain_month = 1, hypertuneOnce = False, static = False, pca_on = False, vim_return = False):
+def fit_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params, retain_month = 1, hypertuneOnce = False, vim_return = False):
 
-    if (pca_on == True):
-        pca = PCA(n_components=None)
-        X_train = pca.fit_transform(X_train)
-        X_val = pca.transform(X_val)
-        X_test = pca.transform(X_test)
-
+   
     print('Starting model fitting...')
     model = tuned_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname = modelname, params = params )
-    counter = 0
 
-    VIM_Mat = VIM(X_train, Y_train, model).reshape(-1,)
+    if vim_return:
+        VIM_Mat = VIM(X_train, Y_train, model).reshape(-1,)
 
+    print('Dynamic method')
+    if (hypertuneOnce):
+        print('Hyperparameter tuning once')
+    else:
+        print('Rehyperparameter tuning')
     print('Starting predictions...')
 
     Y_pred = np.zeros(Y_test.shape[0])
+    X_test_copy = X_test.copy()
+    Y_test_copy = Y_test.copy()
+    counter = 0
+    
 
-    if (static == False):
-        print('Dynamic method')
+    for i in range(len(X_test)):
+        Y_pred[i] = model.predict(X_test[i].reshape(1, -1))
 
-        if (hypertuneOnce):
-            print('Hyperparameter tuning once')
-        else:
-            print('Rehyperparameter tuning')
+        counter += 1
+        if counter % (retain_month*35) == 0 and counter != 0:
+            X_train = np.concatenate((X_train, X_val[:retain_month*35]), axis=0)
+            Y_train = np.concatenate((Y_train, Y_val[:retain_month*35]), axis=0)
+            X_val = X_val[retain_month*35:]
+            X_val = np.concatenate((X_val, X_test_copy[:retain_month*35]), axis=0)
+            Y_val = Y_val[retain_month*35:]
+            Y_val = np.concatenate((Y_val, Y_test_copy[:retain_month*35]), axis=0)
+            X_test_copy = X_test_copy[retain_month*35:]
+            Y_test_copy = Y_test_copy[retain_month*35:]
 
-        for i in range(len(X_test)):
-            Y_pred[i] = model.predict(X_test[i].reshape(1, -1))
-
-            counter += 1
-            if counter % (retain_month*35) == 0 and counter != 0:
-                X_train = np.concatenate((X_train, X_val[:35]), axis=0)
-                Y_train = np.concatenate((Y_train, Y_val[:35]), axis=0)
-                X_val = X_val[35:]
-                X_val = np.concatenate((X_val, X_test[:35]), axis=0)
-                Y_val = Y_val[35:]
-                Y_val = np.concatenate((Y_val, Y_test[:35]), axis=0)
-
-                if (hypertuneOnce):
-                    model = model.fit(X_train, Y_train)
-                else:
-                    model = tuned_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname = modelname, params = params)
-                
+            if (hypertuneOnce):
+                model = model.fit(X_train, Y_train)
+            else:
+                model = tuned_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname = modelname, params = params)
+            
+            if vim_return:
                 new_row = VIM(X_train, Y_train, trained_model = model).reshape(-1,)
                 VIM_Mat = np.vstack((VIM_Mat, new_row))
 
-                # print percentage of run time
-                print('Percentage of run time: ', round(counter/len(X_test)*100, 2), '%')
-                print('Temp R2 score: ', evaluate_model(Y_pred[:counter], Y_test[:counter]))
-    else:
-        print('Static method')
-        for i in range(len(X_test)):
-            counter += 1
-            Y_pred[i] = model.predict(X_test[i].reshape(1, -1))
-
-            if counter % (retain_month*35) == 0 and counter != 0:
-                print('Percentage of run time: ', round(counter/len(X_test)*100, 2), '%')
-                print('Temp R2 score: ', evaluate_model(Y_pred[:counter], Y_test[:counter]))
-
-                new_row = VIM(X_train, Y_train, trained_model = model).reshape(-1,)
-                VIM_Mat = np.vstack((VIM_Mat, new_row))
+            # print percentage of run time
+            print('Percentage of run time: ', round(counter/len(X_test)*100, 2), '%')
+            print('Temp R2 score: ', evaluate_model(Y_pred[:counter], Y_test[:counter]))
 
     print('Traditional R2 score: ', evaluate_model(Y_pred, Y_test))
     print('Gu Kelly R2 score:', evaluate_model_handwritten(Y_pred, Y_test))
@@ -289,15 +276,21 @@ def fit_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params,
     else:
         return Y_pred
 
+def fit_model_static(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params):
+    model = tuned_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname = modelname, params = params)
+    Y_pred = model.predict(X_test)
+    r2_test = evaluate_model_handwritten(Y_pred, Y_test)
+    print(r2_test)
+
 def VIM(X_train, Y_train, trained_model):
 
     # Original MSE
     Y_pred = trained_model.predict(X_train)
-    MSE = mean_squared_error(Y_train, Y_pred)
+    R2 = r2_score(Y_train, Y_pred)
    
         
-    MSE2 = np.zeros((X_train.shape[1],1))
-    MSE_changes = np.zeros((X_train.shape[1],1))
+    R2_2 = np.zeros((X_train.shape[1],1))
+    R2_changes = np.zeros((X_train.shape[1],1))
 
     # Getting the MSE when setting a feature equal to its mean
     for i in range(X_train.shape[1]):
@@ -306,16 +299,15 @@ def VIM(X_train, Y_train, trained_model):
         feature_mean = np.mean(X_train2[:,i])
         X_train2[:,i] = feature_mean
 
-        model2 = trained_model.fit(X_train2, Y_train)
-        Y_pred2 = model2.predict(X_train2)
-        MSE2[i] = mean_squared_error(Y_train, Y_pred2)
+        Y_pred2 = trained_model.predict(X_train2)
+        R2_2[i] = r2_score(Y_train, Y_pred2)
 
     # Computing Proportional Change in MSE for each feature
     
     for i in range(X_train.shape[1]):
-        MSE_changes[i] = np.abs(MSE2[i] - MSE)
+        R2_changes[i] = R2_2[i] - R2
 
     # Make the sum of changes sum to 1
-    VIM_list = MSE_changes/ np.sum(MSE_changes)
+    VIM_list = R2_changes/ np.sum(R2_changes)
 
     return VIM_list
