@@ -281,6 +281,7 @@ def fit_model_static(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, 
     Y_pred = model.predict(X_test)
     r2_test = evaluate_model_handwritten(Y_pred, Y_test)
     print(r2_test)
+    print(evaluate_model(Y_pred, Y_test))
 
 def VIM(X_train, Y_train, trained_model):
 
@@ -305,7 +306,7 @@ def VIM(X_train, Y_train, trained_model):
     # Computing Proportional Change in MSE for each feature
     
     for i in range(X_train.shape[1]):
-        R2_changes[i] = R2_2[i] - R2
+        R2_changes[i] = min(R2_2[i] - R2, 0)
 
     # Make the sum of changes sum to 1
     VIM_list = R2_changes/ np.sum(R2_changes)
