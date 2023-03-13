@@ -16,7 +16,7 @@ from sklearn.neural_network import MLPRegressor
 
 from sklearn.decomposition import PCA
 
-def splitDf(df, non_X_cols = ['Unnamed: 0','Date','Bond','Return_PD'], standardize = 'minmax'):
+def splitDf(df, non_X_cols = ['Unnamed: 0','Date','Bond','Return_PD'], standardize = 'minmax', splitTrain = 0.3, splitVal = 0.5):
 
     # normalize all columns which is not in non_X_cols to -1 and 1
     if (standardize == 'minmax'):
@@ -50,8 +50,8 @@ def splitDf(df, non_X_cols = ['Unnamed: 0','Date','Bond','Return_PD'], standardi
 
     # get the unique dates of df_cleaned column: Date
     dates = df['Date'].unique()
-    middleDate = dates[round(0.3 * len(dates))]
-    seventypercentileDate = dates[round(0.5 * len(dates))]
+    middleDate = dates[round(splitTrain * len(dates))]
+    seventypercentileDate = dates[round(splitVal * len(dates))]
 
         # get data until middleDate of df_cleaned
     df_train = df[df['Date'] < middleDate]
@@ -104,8 +104,8 @@ def splitToXY(df, factor, non_X_cols = ['Unnamed: 0','Date','Bond','Return_PD'],
         
     return X, Y
 
-def splitAll(df, factor = False, non_X_cols = ['Unnamed: 0','Date','Bond','Return_PD'], dropCol = False, standardize = 'mixmax'):
-    df_train, df_val, df_test = splitDf(df, non_X_cols = non_X_cols, standardize = standardize)
+def splitAll(df, factor = False, non_X_cols = ['Unnamed: 0','Date','Bond','Return_PD'], dropCol = False, standardize = 'mixmax', splitTrain = 0.3, splitVal = 0.5):
+    df_train, df_val, df_test = splitDf(df, non_X_cols = non_X_cols, standardize = standardize, splitTrain = splitTrain, splitVal = splitVal)
     X_train, Y_train = splitToXY(df_train, factor, non_X_cols = non_X_cols, dropColumns = dropCol)
     X_val, Y_val = splitToXY(df_val, factor, non_X_cols = non_X_cols, dropColumns = dropCol)
     X_test, Y_test = splitToXY(df_test, factor, non_X_cols = non_X_cols, dropColumns = dropCol)

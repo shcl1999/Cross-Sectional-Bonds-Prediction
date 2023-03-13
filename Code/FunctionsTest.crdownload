@@ -1,0 +1,345 @@
+import pandas as pd
+import numpy as np
+import statsmodels.api as sm
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import classification_report
+from sklearn.model_selection import GridSearchCV
+
+from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import PoissonRegressor
+from sklearn.linear_model import ElasticNet
+from sklearn.ensemble import RandomForestRegressor
+from xgboost import XGBRegressor
+from sklearn.svm import SVR
+from sklearn.neural_network import MLPRegressor
+
+from sklearn.decomposition import PCA
+
+def splitDf(df, non_X_cols = ['Unnamed: 0','Date','Bond','Return_PD'], standardize = 'minmax'):
+
+    # normalize all columns which is not in non_X_cols to -1 and 1
+    if (standardize == 'minmax'):
+        scaler = MinMaxScaler(feature_range=(-1, 1))
+
+        n_rows = 35
+        n_groups = df.shape[0] // n_rows
+
+        # Iterate over the groups
+        for i in range(n_groups):
+            # Get the start and end index of the group
+            start_idx = i*n_rows
+            end_idx = (i+1)*n_rows
+            group_rows = df.iloc[start_idx:end_idx]
+        
+            # Scale the columns of the group
+            for col in group_rows.columns:
+                if col not in non_X_cols:
+                    group_rows[col] = scaler.fit_transform(group_rows[[col]])
+            df.iloc[start_idx:end_idx] = group_rows
+    elif (standardize == 'standard'):
+        scaler = StandardScaler()
+
+        # scale all columns which is not in non_X_cols
+        for col in df.columns:
+            if col not in non_X_cols:
+                df[col] = scaler.fit_transform(df[[col]])
+    else:
+        pass
+
+
+    # get the unique dates of df_cleaned column: Date
+    dates = df['Date'].unique()
+    middleDate = dates[round(0.3 * len(dates))]
+    seventypercentileDate = dates[round(0.5 * len(dates))]
+
+        # get data until middleDate of df_cleaned
+    df_train = df[df['Date'] < middleDate]
+    # get data from middleDate of df_cleaned
+    df_val = df[df['Date'] >= middleDate]
+    df_val = df_val[df_val['Date'] < seventypercentileDate]
+    # get data from seventypercentileDate of df_cleaned
+    df_test = df[df['Date'] >= seventypercentileDate]
+    #df_test = df_test[df_test['Date'] < eigthyfivepercentileDate]
+
+    return df_train, df_val, df_test
+
+
+def factorX(X):
+    X_4factor = X[['Momentum_2_12', 'Pickup', 'Yield', '401_%YoY', 'Beta']]
+    X_4factor['Yield'] = X_4factor['Yield'] - X_4factor['401_%YoY']
+    X_4factor = X_4factor.drop(columns = ['401_%YoY'])
+    return X_4factor
+
+def splitToXY(df, factor, non_X_cols = ['Unnamed: 0','Date','Bond','Return_PD'], dropColumns = False):
+
+    if (factor == True):
+        X = np.zeros((len(df), 4))
+    else:
+        if (dropColumns == True):
+            X = np.zeros((len(df), 26))
+        else:
+            if (len(non_X_cols) == 4):
+                X = np.zeros((len(df), 85))
+            else:
+                X = np.zeros((len(df), 20))
+                
+    Y = np.zeros((len(df), 1))
+    
+    df_X = df.drop(columns= non_X_cols)
+
+    if (dropColumns == True):
+        ### drop columns of df_X with indices 0,  1,  3,  4,  5,  6,  7,  8,  9, 10, 12, 14, 15, 17, 18, 19, 20,  21, 22, 23, 24, 25, 27, 28, 30, 31, 32, 33, 34, 35, 40, 41, 42, 43, 46, 47, 49, 51, 53, 55, 56, 57, 58, 59, 60, 62, 64, 65, 66, 67, 71, 73, 74, 75, 76, 78, 80, 81, 83
+        cols = [0,  1,  3,  4,  5,  6,  7,  8,  9, 10, 12, 14, 15, 17, 18, 19, 20,  21, 22, 23, 24, 25, 27, 28, 30, 31, 32, 33, 34, 35, 40, 41, 42, 43, 46, 47, 49, 51, 53, 55, 56, 57, 58, 59, 60, 62, 64, 65, 66, 67, 71, 73, 74, 75, 76, 78, 80, 81, 83]
+        df_X.drop(df_X.columns[cols], axis=1, inplace=True)
+    df_Y = df['Return_PD']
+
+    if (factor == True):
+        df_X = factorX(df_X)
+
+    # Assign df_X to X
+    for i in range(len(df_X)):
+        X[i] = df_X.iloc[i].values
+        Y[i] = df_Y.iloc[i]
+        
+    return X, Y
+
+def splitAll(df, factor = False, non_X_cols = ['Unnamed: 0','Date','Bond','Return_PD'], dropCol = False, standardize = 'mixmax'):
+    df_train, df_val, df_test = splitDf(df, non_X_cols = non_X_cols, standardize = standardize)
+    X_train, Y_train = splitToXY(df_train, factor, non_X_cols = non_X_cols, dropColumns = dropCol)
+    X_val, Y_val = splitToXY(df_val, factor, non_X_cols = non_X_cols, dropColumns = dropCol)
+    X_test, Y_test = splitToXY(df_test, factor, non_X_cols = non_X_cols, dropColumns = dropCol)
+
+    return X_train, Y_train, X_val, Y_val, X_test, Y_test
+
+def bondsNames(df):
+    df_bonds = df['Bond'][:35]
+    return df_bonds
+
+def evaluate_model(Y_pred, Y_test):
+    
+    # R squared score
+    r2_test = r2_score(Y_test, Y_pred)
+    
+    return r2_test
+
+def evaluate_model_handwritten(Y_pred, Y_test):
+    # R squared score
+
+    num = (sum(pow((Y_test.ravel()-Y_pred),2)))
+    denum = sum(pow(Y_test.ravel(),2))
+
+    r2_test = 1-num/denum
+    return r2_test
+
+def tuned_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params):
+
+    r2_score = -1000000000000000000000000000000
+    best_model = None
+
+    if modelname == 'OLS':
+        best_model = LinearRegression()
+        best_model.fit(X_train, Y_train.ravel())
+
+    if modelname == 'Elastic':
+        for alpha in params['alpha']:
+            for l1 in params['l1_ratio']:
+                model = ElasticNet(alpha = alpha, l1_ratio = l1, fit_intercept= False, tol=1).fit(X_train, Y_train.ravel())
+                Y_pred = model.predict(X_val)
+                r2_test = evaluate_model_handwritten(Y_pred, Y_val)
+                if r2_test > r2_score:
+                    r2_score = r2_test
+                    best_model = model
+
+    if modelname == 'GLM':
+        best_model = PoissonRegressor()
+        best_model.fit(X_train, Y_train.ravel())
+
+    if modelname == 'RF':
+        for depth in params['max_depth']:
+            for features in params['max_features']:
+                for n_estimator in params['n_estimators']:
+                    model = RandomForestRegressor(max_depth = int(depth), n_estimators = int(n_estimator), max_features = int(features))
+                    model.fit(X_train, Y_train.ravel())
+                    Y_pred = model.predict(X_val)
+                    r2_test = evaluate_model_handwritten(Y_pred, Y_val)
+                    #print(r2_test)
+                    if r2_test > r2_score:
+                        r2_score = r2_test
+                        best_model = model
+
+
+    if modelname == 'XGB':
+        for depth in params['max_depth']:
+            for n_estimator in params['n_estimators']:
+                for lr in params['learning_rate']:
+                    for reg_alpha in params['reg_alpha']:
+                        model = XGBRegressor(max_depth = int(depth), n_estimators = int(n_estimator), learning_rate = lr, reg_alpha = reg_alpha,)
+                        model.fit(X_train, Y_train.ravel())
+                        Y_pred = model.predict(X_val)
+                        r2_test = evaluate_model_handwritten(Y_pred, Y_val)
+                        #print(r2_test)
+                        if r2_test > r2_score:
+                            r2_score = r2_test
+                            best_model = model
+
+    if modelname == 'SVM':
+        for c in params['C']:
+            for gamma in params['gamma']:
+                for kernel in params['kernel']:
+                    for epsilon in params['epsilon']:
+                        model = SVR(C = c, gamma = gamma, kernel = kernel, epsilon = epsilon)
+                        model.fit(X_train, Y_train.ravel())
+                        Y_pred = model.predict(X_val)
+                        r2_test = evaluate_model_handwritten(Y_pred, Y_val)
+                        #print(r2_test)
+                        if r2_test > r2_score:
+                            r2_score = r2_test
+                            best_model = model    
+
+    if modelname == 'NN':
+        for hidden_layer_sizes in params['hidden_layer_sizes']:
+            for activation in params['activation']:
+                for solver in params['solver']:
+                    for learning_rate_init in params['learning_rate_init']:
+                        for batch_size in params['batch_size']:
+                            for learning_rate in params['learning_rate']:
+                                    model = MLPRegressor(hidden_layer_sizes = hidden_layer_sizes, activation = activation, solver = solver, learning_rate_init = learning_rate_init, learning_rate = learning_rate, batch_size= batch_size,)
+                                    model.fit(X_train, Y_train.ravel())
+                                    Y_pred = model.predict(X_val)
+                                    r2_test = evaluate_model_handwritten(Y_pred, Y_val)
+                                    #print(r2_test)
+                                    if r2_test > r2_score:
+                                        r2_score = r2_test
+                                        best_model = model
+
+                        
+    X_train_val = np.concatenate((X_train, X_val), axis=0)
+    Y_train_val = np.concatenate((Y_train, Y_val), axis=0)
+    best_model.fit(X_train_val, Y_train_val)
+    return best_model
+
+def fit_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params, retain_month = 1, hypertuneOnce = False, vim_return = False):
+
+   
+    print('Starting model fitting...')
+    model = tuned_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname = modelname, params = params )
+
+    if vim_return:
+        VIM_Mat = VIM(X_train, Y_train, model).reshape(-1,)
+
+    print('Dynamic method')
+    if (hypertuneOnce):
+        print('Hyperparameter tuning once')
+    else:
+        print('Rehyperparameter tuning')
+    print('Starting predictions...')
+
+    Y_pred = np.zeros(Y_test.shape[0])
+    X_test_copy = X_test.copy()
+    Y_test_copy = Y_test.copy()
+    counter = 0
+    
+
+    for i in range(len(X_test)):
+        Y_pred[i] = model.predict(X_test[i].reshape(1, -1))
+
+        counter += 1
+        if counter % (retain_month*35) == 0 and counter != 0:
+            X_train = np.concatenate((X_train, X_val[:retain_month*35]), axis=0)
+            Y_train = np.concatenate((Y_train, Y_val[:retain_month*35]), axis=0)
+            X_val = X_val[retain_month*35:]
+            X_val = np.concatenate((X_val, X_test_copy[:retain_month*35]), axis=0)
+            Y_val = Y_val[retain_month*35:]
+            Y_val = np.concatenate((Y_val, Y_test_copy[:retain_month*35]), axis=0)
+            X_test_copy = X_test_copy[retain_month*35:]
+            Y_test_copy = Y_test_copy[retain_month*35:]
+
+            if (hypertuneOnce):
+                model = model.fit(X_train, Y_train)
+            else:
+                model = tuned_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname = modelname, params = params)
+            
+            if vim_return:
+                new_row = VIM(X_train, Y_train, trained_model = model).reshape(-1,)
+                VIM_Mat = np.vstack((VIM_Mat, new_row))
+
+            # print percentage of run time
+            print('Percentage of run time: ', round(counter/len(X_test)*100, 2), '%')
+            print('Temp R2 score: ', evaluate_model(Y_pred[:counter], Y_test[:counter]))
+
+    print('Traditional R2 score: ', evaluate_model(Y_pred, Y_test))
+    print('Gu Kelly R2 score:', evaluate_model_handwritten(Y_pred, Y_test))
+
+    if (vim_return):
+        return Y_pred, VIM_Mat
+    else:
+        return Y_pred
+
+def fit_model_static(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname, params):
+    model = tuned_model(X_train, Y_train, X_val, Y_val, X_test, Y_test, modelname = modelname, params = params)
+    Y_pred = model.predict(X_test)
+    r2_test = evaluate_model_handwritten(Y_pred, Y_test)
+    print(r2_test)
+
+def VIM(X_train, Y_train, trained_model):
+
+    # Original MSE
+    Y_pred = trained_model.predict(X_train)
+    R2 = r2_score(Y_train, Y_pred)
+   
+        
+    R2_2 = np.zeros((X_train.shape[1],1))
+    R2_changes = np.zeros((X_train.shape[1],1))
+
+    # Getting the MSE when setting a feature equal to its mean
+    for i in range(X_train.shape[1]):
+
+        X_train2 = X_train.copy()
+        feature_mean = np.mean(X_train2[:,i])
+        X_train2[:,i] = feature_mean
+
+        Y_pred2 = trained_model.predict(X_train2)
+        R2_2[i] = r2_score(Y_train, Y_pred2)
+
+    # Computing Proportional Change in MSE for each feature
+    
+    for i in range(X_train.shape[1]):
+        R2_changes[i] = min((R2_2[i] - R2),0)
+
+    # Make the sum of changes sum to 1
+    VIM_list = R2_changes/ np.sum(R2_changes)
+
+    return VIM_list
+
+def DM_adjusted(prediction1, prediction2, Y_test):
+
+    # Get forecast errors
+    error1 = prediction1 - Y_test.ravel()
+    error2 = prediction2 - Y_test.ravel()
+
+    # Square errors 
+    error1_squared = np.square(error1)
+    error2_squared = np.square(error2)
+
+    error_squared_dif = error1_squared - error2_squared
+    
+    # Create a time series without the cross-section
+    n = int (prediction1.shape[0] /35)
+    d = np.zeros(n)
+
+    for i in range(n):
+
+        d[i] = error_squared_dif[(35*i):(35*(1+i)-1)].sum()
+        d[i] = d[i]/35
+
+
+    # Do the DM test with Newey West Standard errors
+
+    X_pred = np.ones((len(d), 1))
+    test = sm.OLS(d, X_pred).fit(cov_type='HAC', cov_kwds={'maxlags': 1})
+
+    DM = test.tvalues[0]
+
+    return DM
